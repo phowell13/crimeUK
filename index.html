@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UK Crime Map Viewer</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+    h1 { color: #333; }
+    #search-bar {
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 250px;
+    }
+    button {
+      padding: 8px 16px;
+      font-size: 16px;
+      margin-left: 10px;
+    }
+    .crime {
+      background: white;
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 5px solid #ff3b3b;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Crimes in the UK (within 10 miles of postcode)</h1>
+
+  <div id="search-bar">
+    <input type="text" id="postcode-input" placeholder="Enter postcode (e.g. HP15 7RT)">
+    <button onclick="refreshData()">Search</button>
+  </div>
+
+  <div id="results">Loading...</div>
+
+  <script>
+    const defaultPostcode = 'HP15 7RT';
+    const resultsDiv = document.getElementById('results');
+    const input = document.getElementById('postcode-input');
+
+    // Load saved postcode if it exists
+    const savedPostcode = localStorage.getItem('lastPostcode');
+    const lastUpdate = localStorage.getItem('lastUpdate');
+
+    const ONE_DAY = 1000 * 60 * 60 * 24;
+
+    async function getLatLng(postcode) {
+      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+      const data = await res.json();
+      if (!data.result) throw new Error("Invalid postcode");
+      return { lat: data.result.latitude, lng: data.result.longitude };
+    }
+
+    async function getCrimes(lat, lng) {
+      const radius = 16093; // 10 miles in meters
+      const res = await fetch(`https://data.police.uk/api/crimes-street/all-crime?lat=${lat}&lng=${lng}&radius=${radius}`);
+      return res.json();
+    }
+
+    async function showCrimes(postcode) {
+      resultsDiv.innerHTML = "Loading...";
+      try {
+        const { lat, lng } = await getLatLng(postcode);
+        const crimes = await getCrimes(lat, lng);
+
+        if (crimes.length === 0) {
+          resultsDiv.innerHTML = "<p>No recent crimes found in this area.</p>";
+          return;
+        }
+
+        resultsDiv.innerHTML = crimes.slice(0, 30).map(crime => `
+          <div class="crime">
+            <strong>${crime.category.replace(/-/g, ' ').toUpperCase()}</strong><br>
+            Location: ${crime.location.street.name}<br>
+            <em>${crime.outcome_status?.category || 'No outcome reported'}</em>
+          </div>
+        `).join('');
+
+        // Save last searched postcode and time
+        localStorage.setItem('lastPostcode', postcode);
+        localStorage.setItem('lastUpdate', Date.now());
+      } catch (error) {
+        resultsDiv.innerHTML = `<p style="color:red;">${error.message}</p>`;
+      }
+    }
+
+    function refreshData() {
+      const postcode = input.value.trim() || defaultPostcode;
+      showCrimes(postcode);
+    }
+
+    // Auto-refresh if last fetch was more than 24 hours ago
+    window.onload = () => {
+      input.value = savedPostcode || defaultPostcode;
+      const now = Date.now();
+      if (!lastUpdate || now - lastUpdate > ONE_DAY) {
+        refreshData();
+      } else {
+        showCrimes(savedPostcode || defaultPostcode);
+      }
+    };
+  </script>
+</body>
+</html>
