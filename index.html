@@ -74,11 +74,13 @@
         }
 
         resultsDiv.innerHTML = crimes.slice(0, 30).map(crime => `
-          <div class="crime">
-            <strong>${crime.category.replace(/-/g, ' ').toUpperCase()}</strong><br>
-            Location: ${crime.location.street.name}<br>
-            <em>${crime.outcome_status?.category || 'No outcome reported'}</em>
-          </div>
+         <div class="crime">
+  <strong>${crime.category.replace(/-/g, ' ').toUpperCase()}</strong><br>
+  Location: ${crime.location.street.name}<br>
+  Date: ${crime.month}<br>
+  <em>${crime.outcome_status?.category || 'No outcome reported'}</em>
+</div>
+
         `).join('');
 
         // Save last searched postcode and time
